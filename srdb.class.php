@@ -173,6 +173,7 @@ class icit_srdb {
 	public $port = 0;
 	public $charset = 'utf8';
 	public $collate = '';
+	public $cnf_file = '';
 
 
 	/**
@@ -241,11 +242,11 @@ class icit_srdb {
 	 * @param array $tables  tables to run replcements against
 	 * @param bool $live    live run
 	 * @param array $exclude_cols  tables to run replcements against
+	 * @param string $cnf_file a path to a mysql config file with credentials for authentication
 	 *
 	 * @return void
 	 */
 	public function __construct( $args ) {
-
 		$args = array_merge( array(
 			'name' 				=> '',
 			'user' 				=> '',
@@ -262,7 +263,8 @@ class icit_srdb {
 			'pagesize' 			=> 50000,
 			'alter_engine' 		=> false,
 			'alter_collation' 	=> false,
-			'verbose'			=> false
+			'verbose'			=> false,
+			'cnf_file' => ''
 		), $args );
 
 		// handle exceptions
@@ -283,16 +285,16 @@ class icit_srdb {
 			if ( is_string( $args[ $maybe_string_arg ] ) )
 				$args[ $maybe_string_arg ] = array_filter( array_map( 'trim', explode( ',', $args[ $maybe_string_arg ] ) ) );
 		}
-		
-		// verify that the port number is logical		
+
+		// verify that the port number is logical
 		// work around PHPs inability to stringify a zero without making it an empty string
 		// AND without casting away trailing characters if they are present.
-		$port_as_string = (string)$args['port'] ? (string)$args['port'] : "0";		
+		$port_as_string = (string)$args['port'] ? (string)$args['port'] : "0";
 		if ( (string)abs( (int)$args['port'] ) !== $port_as_string ) {
 			$port_error = 'Port number must be a positive integer if specified.';
 			$this->add_error( $port_error, 'db' );
 			if ( defined( 'STDIN' ) ) {
-				echo 'Error: ' . $port_error;	
+				echo 'Error: ' . $port_error;
 			}
 			return;
 		}
@@ -315,6 +317,10 @@ class icit_srdb {
 			// try to push the allowed memory up, while we're at it
 			@ini_set( 'memory_limit', '1024M' );
 
+		}
+
+		if (!empty($this->cnf_file)) {
+			$this->load_credentials_from_config_file();
 		}
 
 		// set up db connection
@@ -402,6 +408,23 @@ class icit_srdb {
 		return $this->get( 'use_pdo' );
 	}
 
+	private function load_credentials_from_config_file() {
+		$settings = parse_ini_file($this->cnf_file, true);
+
+		if (!$settings) {
+			$this->add_error('Could not read config file.', 'error');
+		}
+
+		// note, this could be altered so that we allow the user to
+		// specify which credentials to use, but for now I'm hard coding it
+		$client = $settings['client'];
+
+		$this->user = $client['user'];
+		$this->pass = $client['password'];
+		$this->host = $client['host'];
+		$this->port = $client['port'];
+	}
+
 
 	/**
 	 * Setup connection, populate tables array
@@ -485,7 +508,7 @@ class icit_srdb {
 	 * @return PDO|bool
 	 */
 	public function connect_pdo() {
-	
+
 		try {
 			$connection = new PDO( "mysql:host={$this->host};port={$this->port};dbname={$this->name}", $this->user, $this->pass );
 		} catch( PDOException $e ) {
@@ -871,12 +894,12 @@ class icit_srdb {
 
 				// get primary key and columns
 				list( $primary_key, $columns ) = $this->get_columns( $table );
-				
+
 				if ( $primary_key === null || empty( $primary_key ) ) {
 					$this->add_error( "The table \"{$table}\" has no primary key. Changes will have to be made manually.", 'results' );
 					continue;
 				}
-				
+
 				// create new table report instance
 				$new_table_report = $table_report;
 				$new_table_report[ 'start' ] = microtime();
@@ -926,7 +949,7 @@ class icit_srdb {
 							// include cols
 							if ( ! empty( $this->include_cols ) && ! in_array( $column, $this->include_cols ) )
 								continue;
-							
+
 							// Run a search replace on the data that'll respect the serialisation.
 							$edited_data = $this->recursive_unserialize_replace( $search, $replace, $data_to_fix );
 
@@ -958,7 +981,7 @@ class icit_srdb {
 						} elseif ( $update && ! empty( $where_sql ) ) {
 
 							$sql = 'UPDATE ' . $table . ' SET ' . implode( ', ', $update_sql ) . ' WHERE ' . implode( ' AND ', array_filter( $where_sql ) );
-							
+
 							$result = $this->db_update( $sql );
 
 							if ( ! is_int( $result ) && ! $result ) {
@@ -1043,7 +1066,7 @@ class icit_srdb {
 			$report = array( 'engine' => $engine, 'converted' => array() );
 
 			$all_tables = $this->get_tables();
-			
+
 			if ( empty( $tables ) ) {
 				$tables = array_keys( $all_tables );
 			}
@@ -1094,7 +1117,7 @@ class icit_srdb {
 			$report = array( 'collation' => $collation, 'converted' => array() );
 
 			$all_tables = $this->get_tables();
-				
+
 			if ( empty( $tables ) ) {
 				$tables = array_keys( $all_tables );
 			}

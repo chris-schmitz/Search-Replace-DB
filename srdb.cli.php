@@ -18,6 +18,7 @@ $opts = array(
 	'n:' => 'name:',
 	'u:' => 'user:',
 	'p:' => 'pass:',
+	'f:'  => 'cnf-file:',
 	'c:' => 'char:',
 	's:' => 'search:',
 	'r:' => 'replace:',
@@ -35,11 +36,12 @@ $opts = array(
 );
 
 $required = array(
-	'h:',
-	'n:',
-	'u:',
-	'p:'
+	// 'h:',
+	// 'n:',
+	// 'u:',
+	// 'p:'
 );
+
 
 function strip_colons( $string ) {
 	return str_replace( ':', '', $string );
@@ -82,7 +84,9 @@ ARGS
   -u, --user
     Required. Database user.
   -p, --pass
-    Required. Database user's password.
+		Required. Database user's password.
+  -f, --cnf-file
+	  The path to a cnf file containing a [client] connection credentials.
   --port
     Optional. Port on database server to connect to.
     The default is 3306. (MySQL default port).
@@ -160,7 +164,7 @@ foreach( $options as $key => $value ) {
 	// boolean options as is, eg. a no value arg should be set true
 	if ( in_array( $key, $long_opts ) )
 		$value = true;
-	
+
 	switch ( $key ) {
 		// boolean options.
 		case 'verbose':
